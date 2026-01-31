@@ -1,41 +1,25 @@
+
+# Existing VPC (Data Source)
 # -----------------------------
-# VPC and Subnet (Create new ones)
+data "aws_vpc" "existing_vpc" {
+  id = var.vpc_id
+}
+
+# Existing Subnet (Data Source)
 # -----------------------------
-resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"
-  enable_dns_hostnames = true
+data "aws_subnet" "existing_subnet" {
+  id = var.subnet_id
+}
+# Existing Key Pair (Data Source)
+# -----------------------------
 
-  tags = {
-    Name = "terraform-vpc"
-  }
+data "aws_key_pair" "existing" {
+  key_name = var.key_pair_name
 }
 
-resource "aws_subnet" "main" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.1.0/24"
-  availability_zone = data.aws_availability_zones.available.names[0]
 
-  tags = {
-    Name = "terraform-subnet"
-  }
-}
-
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
-# Key pair (create a new one for demo)
-resource "tls_private_key" "main" {
-  algorithm = "RSA"
-  rsa_bits  = 2048
-}
-
-resource "aws_key_pair" "deployer" {
-  key_name   = "terraform-key"
-  public_key = tls_private_key.main.public_key_openssh
-}
-
-# Get AMI for Ubuntu 22.04
+# Ubuntu 22.04 AMI
+# -----------------------------
 data "aws_ami" "ubuntu_2204" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
@@ -51,13 +35,13 @@ data "aws_ami" "ubuntu_2204" {
   }
 }
 
-# -----------------------------
-# One Security Group (shared by both EC2 instances)
+
+# Security Group (SSH only)
 # -----------------------------
 resource "aws_security_group" "ssh_sg" {
   name        = "ec2-ssh-sg"
   description = "Allow SSH access"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = data.aws_vpc.existing_vpc.id
 
   ingress {
     description = "SSH access"
@@ -80,43 +64,22 @@ resource "aws_security_group" "ssh_sg" {
 }
 
 # -----------------------------
-# Create 2 instances using for_each (easy + readable)
+# EC2 Instance
 # -----------------------------
-locals {
-  instances = {
-    "ubuntu-22-04-1" = {
-      instance_type = var.instance_type
-      volume_size   = var.volume_size
-    }
-    "ubuntu-22-04-2" = {
-      instance_type = var.instance_type
-      volume_size   = var.volume_size
-    }
+resource "aws_instance" "ubuntu_ec2" {
+  depends_on             = [aws_security_group.ssh_sg]
+  ami                    = data.aws_ami.ubuntu_2204.id
+  instance_type          = var.instance_type
+  subnet_id              = data.aws_subnet.existing_subnet.id
+  vpc_security_group_ids = [aws_security_group.ssh_sg.id]
+  key_name               = data.aws_key_pair.existing.key_name
+
+  root_block_device {
+    volume_size = var.volume_size
+    volume_type = "gp3"
+  }
+
+  tags = {
+    Name = "ubuntu-22-04"
   }
 }
-
-module "ec2" {
-  source = "./modules/ec2"
-
-  for_each = local.instances
-
-  name          = each.key
-  ami_id        = data.aws_ami.ubuntu_2204.id
-  instance_type = each.value.instance_type
-  subnet_id     = aws_subnet.main.id
-  sg_ids        = [aws_security_group.ssh_sg.id]
-  key_name      = aws_key_pair.deployer.key_name
-  volume_size   = each.value.volume_size
-}
-
-# -----------------------------
-# S3 Bucket Module
-# -----------------------------
-module "s3" {
-  source = "./modules/s3"
-
-  bucket_name = "terraform-demo-bucket-${data.aws_caller_identity.current.account_id}"
-  environment = "dev"
-}
-
-data "aws_caller_identity" "current" {}
