@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = "AWS region"
   type        = string
-  default     = "ap-south-1"
+  default     = "us-east-1"
 }
 
 variable "vpc_id" {
@@ -17,19 +17,9 @@ variable "subnet_id" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type (used by both instances)"
+  description = "EC2 instance type"
   type        = string
   default     = "t3.micro"
-}
-variable "bucket_name" {
-  description = "Name of the S3 bucket (must be globally unique)"
-  type        = string
-}
-
-variable "environment" {
-  description = "Environment tag (dev, prod, etc.)"
-  type        = string
-  default     = "dev"
 }
 
 variable "key_pair_name" {
@@ -37,10 +27,9 @@ variable "key_pair_name" {
   type        = string
   default     = "ubuntu-key"
 }
-
 variable "volume_size" {
-  description = "Root EBS volume size (GB) used by both instances"
+  description = "Size of the root EBS volume in GB"
   type        = number
   default     = 30
-}
 
+}
