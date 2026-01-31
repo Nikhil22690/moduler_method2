@@ -21,6 +21,16 @@ variable "instance_type" {
   type        = string
   default     = "t3.micro"
 }
+variable "bucket_name" {
+  description = "Name of the S3 bucket (must be globally unique)"
+  type        = string
+}
+
+variable "environment" {
+  description = "Environment tag (dev, prod, etc.)"
+  type        = string
+  default     = "dev"
+}
 
 variable "key_pair_name" {
   description = "Existing AWS key pair name"
@@ -33,3 +43,4 @@ variable "volume_size" {
   type        = number
   default     = 30
 }
+
